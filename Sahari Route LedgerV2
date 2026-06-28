@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sahari Cargo - Realtime Cloud Audit Ledger</title>
+    <!-- Tailwind CSS Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SheetJS Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Supabase Official CDN Core Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
+        input, select, textarea { color-scheme: dark; }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col">
+
+    <!-- Header Navigation Bar -->
+    <header class="bg-[#1e293b] border-b border-slate-700 px-6 py-4 flex justify-between items-center shadow-lg sticky top-0 z-50">
+        <div class="flex items-center space-x-3">
+            <div class="font-black text-lg tracking-widest bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">SAHARI CARGO</div>
+            <span class="text-slate-600 text-sm">|</span>
+            <span class="text-xs font-bold text-slate-300 bg-slate-800 px-3 py-1 rounded-md border border-slate-700">CLOUD SYNC AUDIT PORTAL</span>
+        </div>
+        <div id="syncIndicator" class="text-xs font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1 rounded-md flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> CONNECTED TO CLOUD DB
+        </div>
+    </header>
+
+    <main class="flex-1 p-6 max-w-5xl mx-auto w-full space-y-6">
+        
+        <!-- Metadata Context Control Block -->
+        <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5 shadow-xl grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-[11px] font-bold text-cyan-400 uppercase tracking-wider mb-1.5">Driver / Field Officer Identity</label>
+                <div class="relative">
+                    <i class="fa-solid fa-user-tie absolute left-3 top-3 text-slate-500 text-xs"></i>
+                    <input type="text" id="driverIdentity" oninput="saveMetadataToStorage(); fetchLiveCloudRecords();" placeholder="Enter full name" class="w-full bg-[#0f172a] border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:border-cyan-400 transition-colors">
+                </div>
+            </div>
+            <div>
+                <label class="block text-[11px] font-bold text-cyan-400 uppercase tracking-wider mb-1.5">Vehicle Fleet Profile / Operational Route</label>
+                <div class="relative">
+                    <i class="fa-solid fa-route absolute left-3 top-3 text-slate-500 text-xs"></i>
+                    <input type="text" id="vehicleIdentity" oninput="saveMetadataToStorage(); fetchLiveCloudRecords();" placeholder="e.g., Van 04 / Western Area Region" class="w-full bg-[#0f172a] border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs font-semibold text-white focus:outline-hidden focus:border-cyan-400 transition-colors">
+                </div>
+            </div>
+        </div>
+
+        <!-- Ledger Balancing Matrix Dynamic Dashboard View -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl grid grid-cols-2 md:grid-cols-6 gap-3 text-center">
+            <div class="bg-[#1e293b]/40 p-2.5 rounded-lg border border-slate-800">
+                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Gross Inflow</div>
+                <div class="text-sm font-mono font-black text-emerald-400 mt-1" id="sumBoxCash">0.00 <span class="text-[9px] text-slate-500">SAR</span></div>
+            </div>
+            <div class="bg-[#1e293b]/40 p-2.5 rounded-lg border border-slate-800">
+                <div class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Gross Outflow</div>
+                <div class="text-sm font-mono font-black text-rose-400 mt-1" id="sumExpenses">0.00 <span class="text-[9px] text-slate-500">SAR</span></div>
+            </div>
+            <div class="bg-[#1e293b]/40 p-2.5 rounded-lg border border-slate-800">
+                <div class="text-[10px] text-amber-400 font-bold uppercase tracking-wider">Cash Handed</div>
+                <div class="text-sm font-mono font-black text-amber-400 mt-1" id="sumHandoverCash">0.00 <span class="text-[9px] text-slate-500">SAR</span></div>
+            </div>
+            <div class="bg-[#1e293b]/40 p-2.5 rounded-lg border border-slate-800">
+                <div class="text-[10px] text-blue-400 font-bold uppercase tracking-wider">Online Trans.</div>
+                <div class="text-sm font-mono font-black text-blue-400 mt-1" id="sumHandoverOnline">0.00 <span class="text-[9px] text-slate-500">SAR</span></div>
+            </div>
+            <div class="bg-[#1e293b]/40 p-2.5 rounded-lg border border-slate-800">
+                <div class="text-[10px] text-purple-400 font-bold uppercase tracking-wider">Cash On Hand</div>
+                <div class="text-sm font-mono font-black text-purple-400 mt-1" id="sumHandoverEmergency">0.00 <span class="text-[9px] text-slate-500">SAR</span></div>
+            </div>
+            <div class="bg-slate-950 p-2.5 rounded-lg border-2 border-cyan-500/20 shadow-inner col-span-2 md:col-span-1">
+                <div class="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">Remaining</div>
+                <div class="text-sm font-mono font-black text-white mt-1" id="netHandover">0.00 <span class="text-[9px] text-slate-400">SAR</span></div>
+            </div>
+        </div>
+
+        <!-- Operational Input Modules Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Module A: Cash Box Collections Entry -->
+            <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5 shadow-xl lg:col-span-4 space-y-4">
+                <div class="flex items-center space-x-2 border-b border-slate-700/60 pb-2.5 text-emerald-400">
+                    <i class="fa-solid fa-box-archive"></i>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-200">Box Drop Collection Inflow</h2>
+                </div>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-[11px] text-slate-300 font-medium mb-1">Tracking Number / HAWB / Book Ref</label>
+                        <input type="text" id="boxTrackNo" placeholder="e.g., JED-80922" class="w-full bg-[#0f172a] border border-slate-700 rounded-md p-2 text-xs font-mono text-white focus:outline-hidden focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-300 font-medium mb-1">Customer / Shipper Name</label>
+                        <input type="text" id="boxCustomer" placeholder="Enter client identity" class="w-full bg-[#0f172a] border border-slate-700 rounded-md p-2 text-xs text-white focus:outline-hidden focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-300 font-medium mb-1">Physical Cash Collected (SAR)</label>
+                        <input type="number" id="boxCashAmt" placeholder="0.00" class="w-full bg-[#0f172a] border border-slate-700 rounded-md p-2 text-xs font-mono font-bold text-emerald-400 focus:outline-hidden focus:border-emerald-500">
+                    </div>
+                    <button onclick="commitCollectionRow()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs py-2.5 rounded-md shadow-md transition-all cursor-pointer">
+                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Sync & Save Collection
+                    </button>
+                </div>
+            </div>
+
+            <!-- Module B: Road Outlays & Expense Entry Framework -->
+            <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5 shadow-xl lg:col-span-5 space-y-4">
+                <div class="flex items-center space-x-2 border-b border-slate-700/60 pb-2.5 text-rose-400">
+                    <i class="fa-solid fa-gas-pump"></i>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-200">Route Outlays & Operating Expenses</h2>
+                </div>
+                
+                <div class="space-y-3">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] text-slate-300 font-medium mb-1">Expense Category</label>
+                            <select id="expCategory" onchange="handleExpenseCategoryShift()" class="w-full bg-[#0f172a] border border-slate-700 rounded-md p-2 text-xs text-white focus:outline-hidden focus:border-rose-500">
+                                <option value="Petrol">Petrol</option>
+                                <option value="Diesel">Diesel</option>
+                                <option value="Staff Meals">Staff Meals (Food Cash)</option>
+                                <option value="Mandoob/Toll">Mandoob / Port Tolls</option>
+                                <option value="Vehicle Repair">Vehicle Emergency Repairs</option>
+                                <option value="Other Expenses">Other Field Expenses</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-slate-300 font-medium mb-1">Total Amount Disbursed (SAR)</label>
+                            <input type="number" id="expAmt" placeholder="0.00" class="w-full bg-[#0f172a] border border-slate-700 rounded-md p-2 text-xs font-mono font-bold text-rose-400 focus:outline-hidden focus:border-rose-500">
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Sub-Panel: Structured Matrix Grid Specialized for Staff Food Tracking -->
+                    <div id="staffMealMatrixPanel" class="hidden bg-slate-950 border border-amber-500/30 rounded-xl p-4 space-y-3 shadow-inner">
+                        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                            <span class="text-xs font-bold text-amber-400"><i class="fa-solid fa-utensils mr-1.5"></i> Group Food Breakdown Matrix</span>
+                            <span class="text-[10px] bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded-full border border-amber-500/20 font-mono" id="mealLiveMatrixTotal">Linked Total: 0.00 SAR</span>
+                        </div>
+                        
+                        <!-- Mini Matrix Interactive Fields -->
+                        <div class="grid grid-cols-12 gap-2 items-center">
+                            <div class="col-span-4">
+                                <select id="mealStaffSelect" class="w-full bg-[#1e293b] border border-slate-700 rounded-md p-1.5 text-xs text-slate-200 focus:outline-hidden">
+                                    <option value="">-- Staff --</option>
+                                    <option value="Sahari Accountent">Sahari Accountent</option>
+                                    <option value="Nirinsha Nirin">Nirinsha Nirin</option>
+                                    <option value="Thufail Thuf">Thufail Thuf</option>
+                                    <option value="Saleem Sali">Saleem Sali</option>
+                                    <option value="Regwan Bhai">Regwan Bhai</option>
+                                    <option value="Rasel Bhai">Rasel Bhai</option>
+                                    <option value="Muhammed Jahas">Muhammed Jahas</option>
+                                    <option value="Jawhar PC">Jawhar PC</option>
+                                    <option value="Althaf Althaf">Althaf Althaf</option>
+                                    <option value="Muhammed Shafi P">Muhammed Shafi P</option>
+                                    <option value="Sameel VP">Sameel VP</option>
+                                    <option value="Custom">Other Profile</option>
+                                </select>
+                                <input type="text" id="mealStaffCustomName" placeholder="Type name" class="hidden mt-1 w-full bg-[#1e293b] border border-slate-700 rounded-md p-1.5 text-xs text-slate-200 focus:outline-hidden">
+                            </div>
+                            <div class="col-span-4">
+                                <input type="text" id="mealStaffFoodItem" placeholder="What they eat?" class="w-full bg-[#1e293b] border border-slate-700 rounded-md p-1.5 text-xs text-slate-100 focus:outline-hidden">
+                            </div>
+                            <div class="col-span-2">
+                                <input type="number" id="mealStaffCost" placeholder="Cost" class="w-full bg-[#1e293b] border border-slate-700 rounded-md p-1.5 text-xs text-slate-100 font-mono font-bold focus:outline-hidden">
+                            </div>
+                            <div class="col-span-2">
+                                <button type="button" onclick="appendMemberToMealRow()" class="w-full bg-amber-600 hover:bg-amber-700 text-white rounded-md p-1.5 text-xs font-bold transition-all"><i class="fa-solid fa-plus"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Mini Ledger List Box Elements -->
+                        <div class="max-h-[110px] overflow-y-auto bg-[#0f172a] rounded-lg p-2 border border-slate-800 divide-y divide-slate-800" id="mealStaffRenderContainer">
+                            <div class="text-[11px] text-slate-500 italic text-center py-1">No individual itemized lines committed yet.</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] text-slate-300 font-medium mb-1">Remarks / Descriptive Reference / Invoice Notes</label>
+                        <input type="text" id="expRemarks" placeholder="Enter descriptive receipt note reference" class="w-full bg-[#0f172a] border border-slate-700 rounded-md p-2 text-xs text-white focus:outline-hidden focus:border-rose-500">
+                    </div>
+                    <button onclick="commitExpenseRow()" class="w-full bg-rose-700 hover:bg-rose-800 text-white font-bold text-xs py-2.5 rounded-md shadow-md transition-all cursor-pointer">
+                        <i class="fa-solid fa-cloud-arrow-up mr-1"></i> Sync & Save Expense Outlay
+                    </button>
+                </div>
+            </div>
+
+            <!-- Module C: Account Handover & Reconciliation Control -->
+            <div class="bg-[#1e293b] rounded-xl border border-slate-700 p-5 shadow-xl lg:col-span-3 space-y-4">
+                <div class="flex items-center space-x-2 border-b border-slate-700/60 pb-2.5 text-cyan-400">
+                    <i class="fa-solid fa-hand-holding-dollar"></i>
+                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-200">Account Submission</h2>
+                </div>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-[11px] text-amber-400 font-bold uppercase tracking-wide mb-1">Physical Cash Handover</label>
+                        <input type="number" id="reconcilePhysical" oninput="saveSettlementToCloud()" placeholder="0.00" class="w-full bg-[#0f172a] border border-slate-700 rounded-md p-2 text-xs font-mono font-bold text-amber-400 focus:outline-hidden focus:border-amber-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-blue-400 font-bold uppercase tracking-wide mb-1">Online / Bank Transactions</label>
+                        <input type="number" id="reconcileOnline" oninput="saveSettlementToCloud()" placeholder="0.00" class="w-full bg-[#0f172a] border border-slate-700 rounded-md p-2 text-xs font-mono font-bold text-blue-400 focus:outline-hidden focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-purple-400 font-bold uppercase tracking-wide mb-1">Cash Kept on Hand (Emergency)</label>
+                        <input type="number" id="reconcileEmergency" oninput="saveSettlementToCloud()" placeholder="0.00" class="w-full bg-[#0f172a] border border-slate-700 rounded-md p-2 text-xs font-mono font-bold text-purple-400 focus:outline-hidden focus:border-purple-500">
+                    </div>
+                    <div class="bg-slate-950 p-2.5 rounded-md border border-slate-800 text-center">
+                        <div class="text-[10px] font-semibold text-slate-400">Total Accounted Settlement</div>
+                        <div class="text-sm font-mono font-black text-white mt-0.5" id="lblTotalSettled">0.00 SAR</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Ledger Tables Section -->
+        <div class="bg-[#1e293b] rounded-xl border border-slate-700 shadow-xl overflow-hidden">
+            <div class="p-4 bg-slate-900 border-b border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-3">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-300"><i class="fa-solid fa-list-check text-cyan-400 mr-2"></i> Cloud-Synchronized Operational Log Summary</span>
+                <div class="flex items-center gap-2 w-full sm:w-auto">
+                    <button onclick="fetchLiveCloudRecords()" class="w-1/2 sm:w-auto bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs py-2 px-3 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-rotate"></i> Refresh Dashboard
+                    </button>
+                    <button onclick="exportToCorporateExcel()" class="w-1/2 sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black text-xs py-2 px-4 rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                        <i class="fa-solid fa-file-excel text-sm"></i> GENERATE MASTER EXCEL
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-700">
+                <!-- Left: Box Inflow Ledger -->
+                <div class="p-4 overflow-x-auto">
+                    <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-emerald-500"></span> Cash Box Collections</h3>
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="text-slate-400 font-bold border-b border-slate-700 text-[11px]">
+                                <th class="pb-2">Driver</th>
+                                <th class="pb-2">Tracking No.</th>
+                                <th class="pb-2">Shipper</th>
+                                <th class="pb-2 text-right">Cash Inflow</th>
+                                <th class="pb-2 text-center w-12">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="collectionTableBody" class="divide-y divide-slate-800/40">
+                            <tr><td colspan="5" class="text-center py-6 text-slate-500 italic">No cloud lines synced.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Right: Outlays Ledger -->
+                <div class="p-4 overflow-x-auto">
+                    <h3 class="text-xs font-bold text-rose-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-rose-500"></span> Route Outlays & Expenses</h3>
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="text-slate-400 font-bold border-b border-slate-700 text-[11px]">
+                                <th class="pb-2">Driver</th>
+                                <th class="pb-2">Category</th>
+                                <th class="pb-2">Remarks/Matrix</th>
+                                <th class="pb-2 text-right">Outlay Paid</th>
+                                <th class="pb-2 text-center w-12">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="expenseTableBody" class="divide-y divide-slate-800/40">
+                            <tr><td colspan="5" class="text-center py-6 text-slate-500 italic">No cloud lines synced.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // --- KEY INTEGRATION STEP: PROVIDE YOUR DATABASE CONNECTIVITY METRICS ---
+        const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL_HERE"; 
+        const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY_HERE";
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let collectionsList = [];
+        let expensesList = [];
+        let runningMealAllocationItems = [];
+        let globalSettlementData = { physical_cash: 0, online_bank: 0, emergency_cash: 0 };
+        let debounceTimer;
+
+        // --- LIFECYCLE INITIALIZER ---
+        window.addEventListener('DOMContentLoaded', () => {
+            if (localStorage.getItem('sahari_driver_identity')) {
+                document.getElementById('driverIdentity').value = localStorage.getItem('sahari_driver_identity');
+            }
+            if (localStorage.getItem('sahari_vehicle_identity')) {
+                document.getElementById('vehicleIdentity').value = localStorage.getItem('sahari_vehicle_identity');
+            }
+            
+            fetchLiveCloudRecords();
+            // Automatically poll cloud data database updates every 15 seconds
+            setInterval(fetchLiveCloudRecords, 15000);
+        });
+
+        function saveMetadataToStorage() {
+            localStorage.setItem('sahari_driver_identity', document.getElementById('driverIdentity').value);
+            localStorage.setItem('sahari_vehicle_identity', document.getElementById('vehicleIdentity').value);
+        }
+
+        function setStatusIndicator(status) {
+            const ind = document.getElementById('syncIndicator');
+            if (status === 'syncing') {
+                ind.className = "text-xs font-bold text-amber-400 bg-amber-950/40 border border-amber-800/60 px-3 py-1 rounded-md flex items-center gap-1.5";
+                ind.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-spin"></span> SYNCING TO CLOUD...`;
+            } else if (status === 'error') {
+                ind.className = "text-xs font-bold text-rose-400 bg-rose-950/40 border border-rose-800/60 px-3 py-1 rounded-md flex items-center gap-1.5";
+                ind.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> DATABASE CONNECTION FAILURE`;
+            } else {
+                ind.className = "text-xs font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-800/60 px-3 py-1 rounded-md flex items-center gap-1.5";
+                ind.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> LIVE SYNC ACTIVE`;
+            }
+        }
+
+        // --- FETCH MASTER CLOUD RECORDS ---
+        async function fetchLiveCloudRecords() {
+            try {
+                const currentDriver = document.getElementById('driverIdentity').value.trim();
+                
+                // Fetch Box Collections
+                let queryCol = supabaseClient.from('collections').select('*').order('timestamp', { ascending: false });
+                // Fetch Expenses
+                let queryExp = supabaseClient.from('expenses').select('*').order('timestamp', { ascending: false });
+                // Fetch Settlement
+                let querySet = supabaseClient.from('settlements').select('*');
+
+                if (currentDriver !== "") {
+                    querySet = querySet.eq('driver_identity', currentDriver);
+                }
+
+                const [resCol, resExp, resSet] = await Promise.all([queryCol, queryExp, querySet]);
+
+                if (resCol.error) throw resCol.error;
+                if (resExp.error) throw resExp.error;
+                if (resSet.error) throw resSet.error;
+
+                collectionsList = resCol.data || [];
+                expensesList = resExp.data || [];
+                
+                if (resSet.data && resSet.data.length > 0) {
+                    // Pull values for current active driver context
+                    globalSettlementData = resSet.data[0];
+                    if (document.activeElement !== document.getElementById('reconcilePhysical'))
+                        document.getElementById('reconcilePhysical').value = globalSettlementData.physical_cash || '';
+                    if (document.activeElement !== document.getElementById('reconcileOnline'))
+                        document.getElementById('reconcileOnline').value = globalSettlementData.online_bank || '';
+                    if (document.activeElement !== document.getElementById('reconcileEmergency'))
+                        document.getElementById('reconcileEmergency').value = globalSettlementData.emergency_cash || '';
+                } else {
+                    globalSettlementData = { physical_cash: 0, online_bank: 0, emergency_cash: 0 };
+                }
+
+                refreshUIRenderLayouts();
+                setStatusIndicator('live');
+            } catch (err) {
+                console.error("Fetch failure:", err);
+                setStatusIndicator('error');
+            }
+        }
+
+        function calculateLiveReconciliation() {
+            const physical = parseFloat(document.getElementById('reconcilePhysical').value) || 0;
+            const online = parseFloat(document.getElementById('reconcileOnline').value) || 0;
+            const emergency = parseFloat(document.getElementById('reconcileEmergency').value) || 0;
+            
+            document.getElementById('lblTotalSettled').innerText = (physical + online + emergency).toFixed(2) + " SAR";
+            
+            const totalBoxCash = collectionsList.reduce((acc, row) => acc + parseFloat(row.amount), 0);
+            const totalExp = expensesList.reduce((acc, row) => acc + parseFloat(row.amount), 0);
+            
+            const displayGrossInflow = totalBoxCash + emergency; 
+            const remainingNet = displayGrossInflow - totalExp - (physical + online);
+            
+            document.getElementById('sumBoxCash').innerText = displayGrossInflow.toFixed(2);
+            document.getElementById('sumExpenses').innerText = totalExp.toFixed(2);
+            document.getElementById('sumHandoverCash').innerText = physical.toFixed(2);
+            document.getElementById('sumHandoverOnline').innerText = online.toFixed(2);
+            document.getElementById('sumHandoverEmergency').innerText = emergency.toFixed(2);
+            document.getElementById('netHandover').innerText = remainingNet.toFixed(2);
+        }
+
+        // --- SAVE ACCOUNT SUBMISSION REMOTELY ---
+        function saveSettlementToCloud() {
+            calculateLiveReconciliation();
+            setStatusIndicator('syncing');
+            
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(async () => {
+                const driver = document.getElementById('driverIdentity').value.trim().toUpperCase() || "UNASSIGNED DRIVER";
+                const vehicle = document.getElementById('vehicleIdentity').value.trim().toUpperCase() || "UNASSIGNED REGION";
+                const physical = parseFloat(document.getElementById('reconcilePhysical').value) || 0;
+                const online = parseFloat(document.getElementById('reconcileOnline').value) || 0;
+                const emergency = parseFloat(document.getElementById('reconcileEmergency').value) || 0;
+
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('settlements')
+                        .select('id')
+                        .eq('driver_identity', driver);
+
+                    if (error) throw error;
+
+                    if (data && data.length > 0) {
+                        const { error: updErr } = await supabaseClient
+                            .from('settlements')
+                            .update({ vehicle_identity: vehicle, physical_cash: physical, online_bank: online, emergency_cash: emergency })
+                            .eq('id', data[0].id);
+                        if (updErr) throw updErr;
+                    } else {
+                        const { error: insErr } = await supabaseClient
+                            .from('settlements')
+                            .insert([{ driver_identity: driver, vehicle_identity: vehicle, physical_cash: physical, online_bank: online, emergency_cash: emergency }]);
+                        if (insErr) throw insErr;
+                    }
+                    setStatusIndicator('live');
+                } catch (e) {
+                    console.error(e);
+                    setStatusIndicator('error');
+                }
+            }, 1000);
+        }
+
+        // --- COMMIT OPERATIONS ---
+        async function commitCollectionRow() {
+            const driver = document.getElementById('driverIdentity').value.trim().toUpperCase() || "UNSPECIFIED DRIVER";
+            const vehicle = document.getElementById('vehicleIdentity').value.trim().toUpperCase() || "FIELD PICKUP";
+            const trackNo = document.getElementById('boxTrackNo').value.trim().toUpperCase();
+            const customer = document.getElementById('boxCustomer').value.trim().toUpperCase() || "WALK-IN RETAIL CUSTOMER";
+            const cashAmt = parseFloat(document.getElementById('boxCashAmt').value) || 0;
+
+            if (!trackNo || cashAmt <= 0) {
+                alert("Please fill tracking reference keys and correct entry collection totals.");
+                return;
+            }
+            setStatusIndicator('syncing');
+
+            try {
+                const { error } = await supabaseClient.from('collections').insert([
+                    { driver_identity: driver, vehicle_identity: vehicle, track_no: trackNo, customer: customer, amount: cashAmt }
+                ]);
+                if (error) throw error;
+                
+                document.getElementById('boxTrackNo').value = '';
+                document.getElementById('boxCustomer').value = '';
+                document.getElementById('boxCashAmt').value = '';
+                await fetchLiveCloudRecords();
+            } catch (err) {
+                alert("Cloud submission error: " + err.message);
+                setStatusIndicator('error');
+            }
+        }
+
+        async function commitExpenseRow() {
+            const driver = document.getElementById('driverIdentity').value.trim().toUpperCase() || "UNSPECIFIED DRIVER";
+            const vehicle = document.getElementById('vehicleIdentity').value.trim().toUpperCase() || "ROUTE TRUCK OUTLAY";
+            const category = document.getElementById('expCategory').value;
+            const amount = parseFloat(document.getElementById('expAmt').value) || 0;
+            let remarks = document.getElementById('expRemarks').value.trim();
+
+            if (amount <= 0) {
+                alert("Please map explicit structural resource expenditure asset costs.");
+                return;
+            }
+
+            let detailedMatrixSummaryString = "";
+            let structuralItemsArrayBackup = [];
+
+            if (category === "Staff Meals") {
+                if (runningMealAllocationItems.length === 0) {
+                    alert("Please log individual structural employee food breakdown array logs first.");
+                    return;
+                }
+                detailedMatrixSummaryString = runningMealAllocationItems.map(x => `${x.name} (${x.food}): ${x.cost.toFixed(2)}`).join(' | ');
+                structuralItemsArrayBackup = [...runningMealAllocationItems];
+            }
+            setStatusIndicator('syncing');
+
+            try {
+                const { error } = await supabaseClient.from('expenses').insert([
+                    { 
+                        driver_identity: driver, 
+                        vehicle_identity: vehicle, 
+                        category: category, 
+                        amount: amount, 
+                        remarks: remarks || "ROUTE CASH DISBURSEMENT OUTLAY",
+                        meal_meta_breakdown_string: detailedMatrixSummaryString,
+                        meal_raw_data_array: structuralItemsArrayBackup
+                    }
+                ]);
+                if (error) throw error;
+
+                document.getElementById('expAmt').value = '';
+                document.getElementById('expRemarks').value = '';
+                runningMealAllocationItems = [];
+                document.getElementById('expCategory').value = 'Petrol';
+                handleExpenseCategoryShift();
+                rebuildMealLiveDOMMatrix();
+                await fetchLiveCloudRecords();
+            } catch (err) {
+                alert("Cloud sync outlay error: " + err.message);
+                setStatusIndicator('error');
+            }
+        }
+
+        async function deleteCloudCollection(id) {
+            if (confirm("Permanently erase this collection record from the Cloud central database?")) {
+                setStatusIndicator('syncing');
+                const { error } = await supabaseClient.from('collections').delete().eq('id', id);
+                if (error) alert(error.message);
+                await fetchLiveCloudRecords();
+            }
+        }
+
+        async function deleteCloudExpense(id) {
+            if (confirm("Permanently erase this structural outlay log line from the Cloud central database?")) {
+                setStatusIndicator('syncing');
+                const { error } = await supabaseClient.from('expenses').delete().eq('id', id);
+                if (error) alert(error.message);
+                await fetchLiveCloudRecords();
+            }
+        }
+
+        function refreshUIRenderLayouts() {
+            calculateLiveReconciliation();
+
+            const colBody = document.getElementById('collectionTableBody');
+            if (collectionsList.length === 0) {
+                colBody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500 italic">No cloud lines synced.</td></tr>`;
+            } else {
+                colBody.innerHTML = collectionsList.map((item) => `
+                    <tr class="hover:bg-slate-800/30 transition-colors">
+                        <td class="py-2.5 text-slate-400 font-bold text-[10px] uppercase truncate max-w-[70px]">${item.driver_identity || 'SYSTEM'}</td>
+                        <td class="py-2.5 font-mono font-black text-cyan-400">${item.track_no}</td>
+                        <td class="py-2.5 text-slate-300 text-[11px] font-medium truncate max-w-[100px]">${item.customer}</td>
+                        <td class="py-2.5 font-mono text-right text-emerald-400 font-bold">${parseFloat(item.amount).toFixed(2)}</td>
+                        <td class="py-2.5 text-center">
+                            <button onclick="deleteCloudCollection(${item.id})" class="text-rose-500 hover:text-rose-400 cursor-pointer text-xs"><i class="fa-solid fa-trash-can"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            const expBody = document.getElementById('expenseTableBody');
+            if (expensesList.length === 0) {
+                expBody.innerHTML = `<tr><td colspan="5" class="text-center py-6 text-slate-500 italic">No cloud lines synced.</td></tr>`;
+            } else {
+                expBody.innerHTML = expensesList.map((item) => {
+                    let inlineRenderNote = item.remarks;
+                    if (item.category === "Staff Meals" && item.meal_meta_breakdown_string) {
+                        inlineRenderNote = `[MEAL BREAKDOWN: ${item.meal_meta_breakdown_string}] ` + (item.remarks !== "ROUTE CASH DISBURSEMENT OUTLAY" ? `| Notes: ${item.remarks}` : "");
+                    }
+                    return `
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            <td class="py-2.5 text-slate-400 font-bold text-[10px] uppercase truncate max-w-[70px]">${item.driver_identity || 'SYSTEM'}</td>
+                            <td class="py-2.5 font-bold uppercase text-[10px] tracking-wider ${item.category === 'Staff Meals' ? 'text-amber-400' : 'text-slate-200'}">${item.category}</td>
+                            <td class="py-2.5 text-slate-400 text-xs font-medium max-w-[120px] truncate" title="${inlineRenderNote}">${inlineRenderNote}</td>
+                            <td class="py-2.5 font-mono text-right text-rose-400 font-bold">${parseFloat(item.amount).toFixed(2)}</td>
+                            <td class="py-2.5 text-center">
+                                <button onclick="deleteCloudExpense(${item.id})" class="text-rose-500 hover:text-rose-400 cursor-pointer text-xs"><i class="fa-solid fa-trash-can"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // --- MEAL SUBSYSTEM MATRIX GENERATORS ---
+        document.getElementById('mealStaffSelect').addEventListener('change', function() {
+            const val = this.value;
+            const targetInput = document.getElementById('mealStaffCustomName');
+            if (val === 'Custom') targetInput.classList.remove('hidden');
+            else { targetInput.classList.add('hidden'); targetInput.value = ''; }
+        });
+
+        function handleExpenseCategoryShift() {
+            const cat = document.getElementById('expCategory').value;
+            const panel = document.getElementById('staffMealMatrixPanel');
+            if (cat === "Staff Meals") panel.classList.remove('hidden');
+            else panel.classList.add('hidden');
+        }
+
+        function appendMemberToMealRow() {
+            const selectEl = document.getElementById('mealStaffSelect');
+            let staffName = selectEl.value;
+            const customName = document.getElementById('mealStaffCustomName').value.trim();
+            const foodItem = document.getElementById('mealStaffFoodItem').value.trim();
+            const cost = parseFloat(document.getElementById('mealStaffCost').value) || 0;
+
+            if (staffName === 'Custom') staffName = customName;
+            if (!staffName || !foodItem || cost <= 0) {
+                alert("Provide explicit breakdown matrix values.");
+                return;
+            }
+
+            runningMealAllocationItems.push({ name: staffName, food: foodItem, cost: cost });
+            selectEl.value = '';
+            document.getElementById('mealStaffCustomName').classList.add('hidden').value = '';
+            document.getElementById('mealStaffFoodItem').value = '';
+            document.getElementById('mealStaffCost').value = '';
+            rebuildMealLiveDOMMatrix();
+        }
+
+        function removeMemberFromMealRow(idx) {
+            runningMealAllocationItems.splice(idx, 1);
+            rebuildMealLiveDOMMatrix();
+        }
+
+        function rebuildMealLiveDOMMatrix() {
+            const box = document.getElementById('mealStaffRenderContainer');
+            const totalLabel = document.getElementById('mealLiveMatrixTotal');
+            const currentSum = runningMealAllocationItems.reduce((acc, x) => acc + x.cost, 0);
+            
+            totalLabel.innerText = `Linked Total: ${currentSum.toFixed(2)} SAR`;
+            document.getElementById('expAmt').value = currentSum > 0 ? currentSum.toFixed(2) : '';
+
+            if (runningMealAllocationItems.length === 0) {
+                box.innerHTML = `<div class="text-[11px] text-slate-500 italic text-center py-1">No individual itemized lines committed yet.</div>`;
+                return;
+            }
+
+            box.innerHTML = runningMealAllocationItems.map((item, idx) => `
+                <div class="flex justify-between items-center py-1.5 text-xs text-slate-300 font-medium">
+                    <span class="text-amber-400/90 font-semibold"><i class="fa-solid fa-user-check text-[10px] mr-1 text-slate-500"></i> ${item.name} <span class="text-slate-400 text-[11px] font-normal italic">(${item.food})</span></span>
+                    <div class="flex items-center space-x-2">
+                        <span class="font-mono text-slate-100 font-bold">${item.cost.toFixed(2)} SAR</span>
+                        <button type="button" onclick="removeMemberFromMealRow(${idx})" class="text-rose-400 hover:text-rose-600 cursor-pointer"><i class="fa-solid fa-trash-can text-[10px]"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- MASTER EXCEL REPORT COMPILING ---
+        function exportToCorporateExcel() {
+            const dateStr = new Date().toISOString().split('T')[0];
+
+            const totalBoxCash = collectionsList.reduce((acc, r) => acc + parseFloat(r.amount), 0);
+            const totalExp = expensesList.reduce((acc, r) => acc + parseFloat(r.amount), 0);
+            const physical = parseFloat(document.getElementById('reconcilePhysical').value) || 0;
+            const online = parseFloat(document.getElementById('reconcileOnline').value) || 0;
+            const emergency = parseFloat(document.getElementById('reconcileEmergency').value) || 0;
+            
+            const displayGrossInflow = totalBoxCash + emergency;
+            const netHandover = displayGrossInflow - totalExp - (physical + online);
+
+            // SHEET 1: BALANCE OVERVIEW
+            const overviewRows = [
+                ["SAHARI CARGO & COURIER SERVICE"],
+                ["CENTRAL CLOUD ACCOUNTING AUDIT STATEMENT SUMMARY"],
+                [],
+                ["STATEMENT GENERATION TIMESTAMPS", dateStr],
+                [],
+                ["FINANCIAL LOG METRIC TYPE", "TOTAL CONSOLIDATED VALUE (SAR)"],
+                ["TOTAL CLOUD CASH BOX COLLECTIONS (+)", totalBoxCash],
+                ["TOTAL CLOUD OPERATIONAL ROUTE DISBURSEMENTS (-)", totalExp],
+                ["TOTAL VERIFIED CASH SUBMISSIONS (-)", physical],
+                ["TOTAL VERIFIED BANK TRANSACTION INTERCHANGES (-)", online],
+                ["TOTAL DRIVER RESERVE CASH HELD ON HAND", emergency],
+                ["NET UNACCOUNTED OUTSTANDING PORTAL LIABILITIES DUE", netHandover]
+            ];
+            const wsSummary = XLSX.utils.aoa_to_sheet(overviewRows);
+            wsSummary['!cols'] = [{ wch: 55 }, { wch: 35 }];
+
+            // SHEET 2: ALL COLLECTIONS
+            const colHeader = [["METRIC TIMESTAMP", "SUBMITTING DRIVER OFFICER", "ASSIGNED FLEET ROUTE", "AWB/TRACKING CODE", "CLIENT NAME", "CASH REVENUE AMOUNT (SAR)"]];
+            const colDataRows = collectionsList.map(c => [c.timestamp, c.driver_identity, c.vehicle_identity, c.track_no, c.customer, parseFloat(c.amount)]);
+            const wsCol = XLSX.utils.aoa_to_sheet(colHeader.concat(colDataRows));
+            wsCol['!cols'] = [{ wch: 22 }, { wch: 20 }, { wch: 22 }, { wch: 20 }, { wch: 30 }, { wch: 25 }];
+
+            // SHEET 3: ALL EXPENSES
+            const expHeader = [["METRIC TIMESTAMP", "SUBMITTING DRIVER OFFICER", "EXPENSE TYPE CLASSIFICATION", "AUDIT DESCRIPTION REMARKS", "OUTFLOW VALUE AMOUNT (SAR)"]];
+            const expDataRows = expensesList.map(e => [e.timestamp, e.driver_identity, e.category, e.meal_meta_breakdown_string ? `[SPLITS: ${e.meal_meta_breakdown_string}] | ${e.remarks}` : e.remarks, parseFloat(e.amount)]);
+            const wsExp = XLSX.utils.aoa_to_sheet(expHeader.concat(expDataRows));
+            wsExp['!cols'] = [{ wch: 22 }, { wch: 20 }, { wch: 25 }, { wch: 55 }, { wch: 25 }];
+
+            // SHEET 4: GRANULAR FOOD SUB-MATRIX
+            const mealHeader = [["SUBMITTING OFFICER DRIVER ID", "EMPLOYEE ACCOUNT DESIGNATION PROFILE", "FOOD/ITEM DISBURSEMENT STATEMENT", "ALLOCATED COST UNIT (SAR)"]];
+            let mealDataRows = [];
+            expensesList.forEach(e => {
+                if(e.category === "Staff Meals" && e.meal_raw_data_array) {
+                    try {
+                        const arr = typeof e.meal_raw_data_array === 'string' ? JSON.parse(e.meal_raw_data_array) : e.meal_raw_data_array;
+                        if(Array.isArray(arr)) {
+                            arr.forEach(m => {
+                                mealDataRows.push([e.driver_identity, m.name.toUpperCase(), m.food.toUpperCase(), parseFloat(m.cost)]);
+                            });
+                        }
+                    } catch(err) { console.error("Error formatting sub-array structural row", err); }
+                }
+            });
+            const wsMeal = XLSX.utils.aoa_to_sheet(mealHeader.concat(mealDataRows));
+            wsMeal['!cols'] = [{ wch: 25 }, { wch: 35 }, { wch: 35 }, { wch: 25 }];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, wsSummary, "Audited Statement Overviews");
+            XLSX.utils.book_append_sheet(wb, wsCol, "Master Inflow Collections");
+            XLSX.utils.book_append_sheet(wb, wsExp, "Master Outflow Expenses");
+            XLSX.utils.book_append_sheet(wb, wsMeal, "Staff Meal Split Matrix");
+
+            XLSX.writeFile(wb, `Sahari_Master_Cloud_Report_${dateStr}.xlsx`);
+        }
+    </script>
+</body>
+</html>
